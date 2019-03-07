@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "xmemory": "cpp",
+        "xstddef": "cpp",
+        "xtr1common": "cpp",
+        "iosfwd": "cpp",
+        "xlocale": "cpp"
+    }
+}
