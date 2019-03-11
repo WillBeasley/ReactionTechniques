@@ -9,6 +9,7 @@ Follow the instructions from Lancaster university [here](https://lancaster-unive
 TBA
 ## Usage
 When started you will be asked to select which game mode to play. Available modes are:
+
 | ID | Game Mode |
 | --- | --- |
 | 1 | Average Reaction Time |
