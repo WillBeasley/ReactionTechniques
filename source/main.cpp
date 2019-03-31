@@ -1,66 +1,61 @@
-/*
-The MIT License (MIT)
-
-Copyright (c) 2016 British Broadcasting Corporation.
-This software is provided by Lancaster University by arrangement with the BBC.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-*/
 #include "MicroBit.h"
 #include "HighScoreManager.h"
 #include "GPIOManager.h"
+
+// Shortcut for finding how big an array is
+#define DIM(x) sizeof(x)/sizeof(x[0])
+
+// Microbit object for tieing together all microbit functionality.
 MicroBit uBit;
 
-
+// Class for managing the highscores stored in memory.
 HighScoreManager Highscores;
 
+// Manages interaction with external GPIO MCP23017 via i2c
 GPIOManager IOManager;
 
-/// <summary>
-/// Structure for pairing up which IO refer to which buttons.
-/// </summary>
+// Structure for pairing up which IO refer to which buttons.
 struct ButtonStruct
 {
+    // Input pin on the GPIO for the button
 	int InputPin;
-	// ReSharper disable once CppInconsistentNaming
+	
+    // PIN used to lighting up the buttons LED
 	int LEDPin;
 };
 
 // List of all the button LED and Input pin assignments
 const ButtonStruct Buttons[] = {
-	{1,2},
-	{2,1},
-	{3,0}
+	{1,4},
+	{2,3},
+	{3,2},
+    {4,1},
+    {6,0}
 };
 
-void Game1();
+enum GameModes{
+    ReactionTime = 0x01,
+    ButtonCount = 0x02,
+    Versus = 0x03
+};
 
-void Game2();
+// Test average reaction times
+void ReactionTimerGame();
 
+// How many buttons can be pressed in the time.
+void ButtonCountGame();
 
+// Two player vs mode
+void VersusGame();
+
+// Entry point for the program.
 int main()
 {
     // Initialise the micro:bit runtime.
     uBit.init();
-
+    uBit.display.scrollAsync("Starting up!!");
     // Wait for external devices to power up
-    wait_ms(2000);
+    wait_ms(5000);
     
     // Read the header information & calculate averages.
     Highscores.Initialise(&uBit);
@@ -74,39 +69,80 @@ int main()
         Highscores.Reset();
     }
 
-    int modeSelect = 1;
+    // Clear the display, in case the microbit is still scrolling the statup message
+    uBit.display.stopAnimation();
+    uBit.display.clear();
+
+    // Set all the outputs to be off.
+    IOManager.writeRegister(0x09, 0x00);
+
+    wait_ms(200);
+
+    // Set default gamemode
+    int modeSelect = GameModes::ReactionTime;
+
     // Main Loop
     while(1){
+
         // Select the game mode that we want to play.
         while(1){
-            //uBit.display.printAsync("Press any button to start!");
+
+            // Light up all the buttons on the main menu
+            IOManager.digitalWrite(Buttons[0].LEDPin, true);
+            IOManager.digitalWrite(Buttons[2].LEDPin, true);
+            IOManager.digitalWrite(Buttons[4].LEDPin, true);
+
+            // Update the display to show the currently selected mode.
             uBit.display.print(modeSelect);
-            if(uBit.buttonB.isPressed()){
-                if (modeSelect != 3){
-                    modeSelect++;
-                }
-                while(uBit.buttonB.isPressed());
-            }
-            if(uBit.buttonA.isPressed()){
+
+            // Mode selection uses Button 1 and Button 5 (Most left and Most right) buttons.
+            // The white button (button 3) confirms the selection. 
+            char inputFlag = IOManager.ReadPortB();
+
+            // Which button was pressed
+            if (IOManager.isBitSetExclusive(inputFlag, Buttons[0].InputPin)){
+                // Left Button
                 if (modeSelect != 1){
                     modeSelect--;
                 }
-                while(uBit.buttonA.isPressed());
+                // Wait until they let go of the button.
+                while(IOManager.ReadPortB());
+
             }
-            if (IOManager.ReadPortB()){
+            else if (IOManager.isBitSetExclusive(inputFlag, Buttons[4].InputPin)){
+                // Right Button
+                if (modeSelect != 3){
+                    modeSelect++;
+                }
+                // Wait until they let go of the button.
+                while(IOManager.ReadPortB());
+
+            }
+            else if (IOManager.isBitSetExclusive(inputFlag, Buttons[2].InputPin)){
+                // Middle Button
+                IOManager.writeRegister(0x09, 0x00);
+                
+                // Wait until they let go of the button.
+                while(IOManager.ReadPortB());
+
+                // Exit the loop
                 break;
             }
-
         }
 
+        // Start the selected game.
         switch (modeSelect)
         {
-            case 1:
-                Game1();
+            case GameModes::ReactionTime:
+                ReactionTimerGame();
                 wait_ms(300);
                 break;
-            case 2:
-                Game2();
+            case GameModes::ButtonCount:
+                ButtonCountGame();
+                wait_ms(300);
+                break;
+            case GameModes::Versus:
+                VersusGame();
                 wait_ms(300);
                 break;
             default:
@@ -124,91 +160,36 @@ int main()
     release_fiber();
 }
 
-void Game1(){
-    uBit.display.stopAnimation();
-        uBit.display.clear();
-        int pin = 2;
-        int button = 0;
-        int oldButton = 0;
-        uint32_t sum = 0;
-        for(int i=0; i< 10; i++){
-            
-            // This will clear pending interrupt
-            //IOManager.ReadPortB();
-            //uBit.serial.send("GO!\n\r");
-            
-            // Choose button in range 0-2
-            while (button == oldButton){
-                button = rand() % 3;
-            }
-            oldButton = button;
 
 
-            IOManager.digitalWrite(Buttons[button].LEDPin, true);
-            
-            uint32_t time1 = us_ticker_read();
-            
-            while(1){
-                
-                // Wait for them to press the button
-                while(!uBit.io.P8.getDigitalValue());
-
-                // Check which input changed
-                char inputFlag = IOManager.ReadPortB();
-                
-                // Check if the chosen pin was pressed
-                if (IOManager.isBitSet(inputFlag, Buttons[button].InputPin)){
-                    // Calculate the time it took for the button to be 
-                    uint32_t time2 = us_ticker_read();
-                    uint32_t result = (time2-time1);
-                    //uBit.serial.send((int)result);
-                    //uBit.serial.send("\n\r");
-                    sum += result;
-                    // Wait for the pin to be let go
-                    while(IOManager.digitalRead(Buttons[button].InputPin));
-                    // Turn off button LED
-                    IOManager.digitalWrite(Buttons[button].LEDPin, false);
-                    
-                    break;
-                }else{
-
-                }
-            }
-
-        }
-
-        sum /= 10000;
-        uBit.serial.send("AVG:");
-        uBit.serial.send((int)sum);
-        uBit.serial.send("\n\r");
-        uBit.display.scroll((int)sum);
-}
-
-// Count how many within timeframe
-void Game2(){
-    // How many butons can you press in 10 seconds.
+void ReactionTimerGame(){
+    // Clear anything off the display
     uBit.display.stopAnimation();
     uBit.display.clear();
-    int pin = 2;
-    int button = 0;
+
+    // The current and old button. This prevents repeated buttons
+    int currentButton = 0;
     int oldButton = 0;
+
+    // The running sum used to calucate average reaction time.
     uint32_t sum = 0;
-    int count = 0;
-    // Set timout for ten seconds time
-    uint32_t timeout = us_ticker_read() + (10 * 1000000);
-    while(us_ticker_read() < timeout){
-       
-        // Choose button in range 0-2
-        while (button == oldButton){
-            button = rand() % 3;
-        }
-        oldButton = button;
 
-
-        IOManager.digitalWrite(Buttons[button].LEDPin, true);
+    // Loop thorugh 10 times.
+    for(int i=0; i< 10; i++){
         
+        // Choose button in range of Buttons
+        while (currentButton == oldButton){
+            currentButton = rand() % DIM(Buttons);
+        }
+        oldButton = currentButton;
+
+        // Light up the chosen button's LED
+        IOManager.digitalWrite(Buttons[currentButton].LEDPin, true);
+        
+        // Save the current time.
         uint32_t time1 = us_ticker_read();
         
+        // Needs to loop for the case where the incorrect button is pressed.
         while(1){
             
             // Wait for them to press the button
@@ -218,19 +199,18 @@ void Game2(){
             char inputFlag = IOManager.ReadPortB();
             
             // Check if the chosen pin was pressed
-            if (IOManager.isBitSet(inputFlag, Buttons[button].InputPin)){
-                // Calculate the time it took for the button to be 
-                uint32_t time2 = us_ticker_read();
-                uint32_t result = (time2-time1);
-                //uBit.serial.send((int)result);
-                //uBit.serial.send("\n\r");
-                sum += result;
-                // Wait for the pin to be let go
-                while(IOManager.digitalRead(Buttons[button].InputPin));
-                // Turn off button LED
-                IOManager.digitalWrite(Buttons[button].LEDPin, false);
-                count ++;
+            if (IOManager.isBitSetExclusive(inputFlag, Buttons[currentButton].InputPin)){
+                // They have pressed the correct button.
 
+                // Calculate the time it took for the button to be pressed, add it to the current total
+                sum += (us_ticker_read() - time1);
+
+                // Wait for the pin to be let go
+                while(IOManager.digitalRead(Buttons[currentButton].InputPin));
+
+                // Turn off button LED
+                IOManager.digitalWrite(Buttons[currentButton].LEDPin, false);
+                
                 break;
             }else{
 
@@ -239,10 +219,116 @@ void Game2(){
 
     }
 
+    // Game finished, display the average on the display (in ms).
     sum /= 10000;
     uBit.serial.send("AVG:");
     uBit.serial.send((int)sum);
     uBit.serial.send("\n\r");
+    uBit.display.scroll((int)sum);
+}
+
+// Count how many buttons can be pressed within a 10 second timeframe.
+void ButtonCountGame(){
+    // Clear anything off the display
+    uBit.display.stopAnimation();
+    uBit.display.clear();
+
+    // Store the current an old buttons, used to make sure repeat buttons are not possible.
+    int currentButton = 0;
+    int oldButton = 0;
+
+    // Count of how many buttons can be pressed within the time.
+    int count = 0;
+
+
+    // Set timout for ten seconds time
+    uint32_t timeout = us_ticker_read() + (10 * 1000000);
+
+    // While the timeout has not been elapsed.
+    while(us_ticker_read() < timeout){
+       
+        // Choose button in range of Buttons
+        while (currentButton == oldButton){
+            currentButton = rand() % DIM(Buttons);
+        }
+
+        // Store the chosen button for the next loop.
+        oldButton = currentButton;
+
+        // Enable the chosen button's LED
+        IOManager.digitalWrite(Buttons[currentButton].LEDPin, true);
+        
+   
+        while(1){
+            
+            // Wait for them to press the button
+            while(!uBit.io.P8.getDigitalValue());
+
+            // Check which input changed
+            char inputFlag = IOManager.ReadPortB();
+            
+            // Check if the chosen pin was pressed
+            if (IOManager.isBitSetExclusive(inputFlag, Buttons[currentButton].InputPin)){
+                // The correct button was pressed!
+
+                // Wait for the pin to be let go.
+                while(IOManager.digitalRead(Buttons[currentButton].InputPin));
+
+                // Turn off button LED
+                IOManager.digitalWrite(Buttons[currentButton].LEDPin, false);
+
+                // Increment the counter
+                count++;
+
+                break;
+            }else{
+                // The wrong button was pressed. Decrement the Counter >:)
+                //count--;
+            }
+        }
+    }
+
     uBit.display.scroll(count);
+
+}
+
+void VersusGame(){
+    // Clear anything off the display
+    uBit.display.stopAnimation();
+    uBit.display.clear(); 
+
+    // Select which button will be next
+    // Count down to enabling the button
+    // Enable the two LEDs
+    // Wait for the button to be pressed
+    // Determine who pressed the button first.
+    // Display arrow pointing to winner
+
+    
+    // This should only be range 0-1 as each player only has 2 buttons
+    int button = rand() % 2;
+     
+    // Create the mask
+    char mask = 1 << (button + 3);
+    mask += button;
+
+
+    uBit.display.print("3");
+    wait_ms(1000);
+    
+    uBit.display.print("2");
+    wait_ms(1000);
+
+    uBit.display.print("1");
+    wait_ms(1000);
+
+    // Turn on the LEDS
+    IOManager.writeRegister(0x09, mask);
+
+    // Wait for them to press the button
+    while(!uBit.io.P8.getDigitalValue());
+
+    //Read in the special mask
+    
 
 }

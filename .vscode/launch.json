@@ -5,7 +5,7 @@
             "name": "Microbit Debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}\\build\\bbc-microbit-classic-gcc\\source\\reation-techniques-combined.hex",
+            "program": "${workspaceRoot}\\build\\bbc-microbit-classic-gcc\\source\\reaction-techniques-combined.hex",
             "args": [],
             "stopAtEntry": true,
             "cwd": "${workspaceRoot}",
@@ -34,8 +34,8 @@
                     { "text": "-interpreter-exec console \"monitor reset\"", "ignoreFailures": false },
                     { "text": "-interpreter-exec console \"monitor halt\"", "ignoreFailures": false },
                     { "text": "-interpreter-exec console \"monitor soft_reset_halt\"", "ignoreFailures": false },
-                    { "text": "-file-exec-file ./reation-techniques-combined.hex", "description": "load file", "ignoreFailures": false},
-                    { "text": "-file-symbol-file ./reation-techniques", "description": "load synbol file", "ignoreFailures": false},
+                    { "text": "-file-exec-file ./reaction-techniques-combined.hex", "description": "load file", "ignoreFailures": false},
+                    { "text": "-file-symbol-file ./reaction-techniques", "description": "load synbol file", "ignoreFailures": false},
                 ]
             }
         }

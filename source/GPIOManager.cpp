@@ -98,9 +98,26 @@ char GPIOManager::readRegister(char addr){
 
 }
 
+void GPIOManager::writeRegister(char addr, char value){
+    CommsBuffer.Data[0] = addr;
+    CommsBuffer.Data[1] = value;
+    mpuBit->i2c.write(0x40, CommsBuffer.Data, 2);
+
+}
+
 bool GPIOManager::isBitSet(char data, int bit){
     data >>= bit;
     return data & 0x01;
 
+
+}
+
+bool GPIOManager::isBitSetExclusive(char data, int bit){
+
+    // Select bit we want.
+    char temp = 1 << bit;
+
+    data &= temp;
+    return data == temp;
 
 }

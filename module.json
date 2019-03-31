@@ -1,7 +1,7 @@
 {
-  "name": "reation-techniques",
-  "version": "1.0.0",
-  "description": "A fun reation game for the bbc micro::bit.",
+  "name": "reaction-techniques",
+  "version": "1.1.0",
+  "description": "A fun reaction game for the bbc micro::bit.",
   "license": "MIT",
   "dependencies": {
     "microbit": "lancaster-university/microbit#v2.1.1"

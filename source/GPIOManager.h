@@ -24,7 +24,11 @@ class GPIOManager{
 
     char readRegister(char addr);
 
+    void writeRegister(char addr, char value);
+
     bool isBitSet(char data, int bit);
+
+    bool isBitSetExclusive(char data, int bit);
 
     private:
     BuffStruct CommsBuffer;
